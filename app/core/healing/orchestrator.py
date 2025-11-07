@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.tests import TestCase, TestType
 from app.core.executor.result_types import TestResult
@@ -26,7 +26,7 @@ class HealingResult(BaseModel):
     retry_count: int = 0
     new_assertions: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
-    timestamp: datetime = datetime.now()
+    timestamp: datetime = Field(default_factory=datetime.now)
     
     class Config:
         use_enum_values = True

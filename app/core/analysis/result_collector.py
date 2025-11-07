@@ -1,9 +1,7 @@
-from __future__ import annotations
-
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from collections import defaultdict
 

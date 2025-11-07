@@ -1,3 +1,8 @@
+import os
+# Disable TensorFlow imports in Transformers (we only use PyTorch)
+os.environ["TRANSFORMERS_NO_TF"] = "1"
+os.environ["USE_TF"] = "0"
+
 from typing import Iterable, List, Optional, Dict, Any
 import numpy as np
 from sentence_transformers import SentenceTransformer
