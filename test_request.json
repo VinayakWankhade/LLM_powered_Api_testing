@@ -1,0 +1,5 @@
+{
+  "endpoint": "/users", 
+  "method": "GET", 
+  "top_k": 3
+}
