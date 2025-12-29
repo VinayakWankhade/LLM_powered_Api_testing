@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  /* Custom Colors */
+  --color-purple: #7c3aed;
+  --color-purple-light: #8b5cf6;
+  --color-purple-dark: #6d28d9;
+  --color-cyan: #00ffff;
+  --color-cyan-light: #06b6d4;
+
+  /* Custom Shadows */
+  --shadow-glow-purple: 0 0 20px rgb(124 58 237 / 0.3);
+  --shadow-glow-cyan: 0 0 20px rgb(0 255 255 / 0.3);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-zinc-950;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-zinc-800 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-zinc-700;
+}
