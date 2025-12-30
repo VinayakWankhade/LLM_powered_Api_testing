@@ -1,361 +1,276 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Search, ChevronDown, Eye } from 'lucide-react';
+import { ArrowLeft, Search, ChevronDown, Eye, Loader2, AlertTriangle, CheckCircle, BarChart2, Globe, Shield } from 'lucide-react';
+import { analyticsApi, endpointsApi, projectsApi } from '../api';
 
 const CoverageReport = () => {
-    const { id, runId } = useParams();
-    const [methodFilter, setMethodFilter] = useState('All Methods');
-    const [statusFilter, setStatusFilter] = useState('All Status');
+    const { id } = useParams();
+    const [analytics, setAnalytics] = useState(null);
+    const [endpoints, setEndpoints] = useState([]);
+    const [project, setProject] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [methodFilter, setMethodFilter] = useState('All Methods');
 
-    const coverageStats = [
-        { label: 'Overall API Coverage', value: '85%', subtext: '+12% from last week', color: 'purple', icon: '📊' },
-        { label: 'Endpoints Covered', value: '150/175', subtext: '25 endpoints remaining', color: 'cyan', icon: '🔌' },
-        { label: 'Methods Covered', value: '342', subtext: 'GET, POST, PUT, DELETE', color: 'orange', icon: '</>' },
-        { label: 'Parameters Covered', value: '1,247', subtext: 'Input & Output params', color: 'blue', icon: '{x}' },
-    ];
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const [analyticsData, endpointData, projectData] = await Promise.all([
+                    analyticsApi.getProjectAnalytics(id),
+                    endpointsApi.list(id),
+                    projectsApi.get(id)
+                ]);
+                setAnalytics(analyticsData);
+                setEndpoints(endpointData);
+                setProject(projectData);
+            } catch (err) {
+                console.error("Error fetching coverage data:", err);
+                setError("Failed to generate coverage report for this node.");
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const criticalGaps = [
-        { path: '/api/v1/admin/delete', risk: 'High Risk', category: 'Admin Operations', coverage: '0%' },
-        { path: '/api/v1/payments/process', risk: 'High Risk', category: 'Financial Operations', coverage: '15%' },
-        { path: '/api/v1/auth/reset-password', risk: 'Medium Risk', category: 'Authentication', coverage: '8%' },
-    ];
+        fetchData();
+    }, [id]);
 
-    const endpoints = [
-        {
-            path: '/api/v1/users',
-            methods: ['GET', 'POST', 'PUT'],
-            methodCount: '3/4 methods',
-            coverage: 75,
-            paramCoverage: 82,
-            params: '18/22 params',
-        },
-        {
-            path: '/api/v1/projects',
-            methods: ['GET', 'POST', 'PUT', 'DELETE'],
-            methodCount: '4/4 methods',
-            coverage: 95,
-            paramCoverage: 88,
-            params: '15/17 params',
-        },
-        {
-            path: '/api/v1/admin/delete',
-            methods: ['DELETE'],
-            methodCount: '0/1 methods',
-            coverage: 0,
-            paramCoverage: 0,
-            params: '0/5 params',
-        },
-    ];
+    const coverageStats = analytics ? [
+        { label: 'System Coverage', value: `${analytics.coveragePercent}%`, subtext: 'Aggregate URI reachability', color: 'purple', Icon: BarChart2 },
+        { label: 'Manifest Sync', value: `${analytics.coveredEndpoints}/${analytics.totalEndpoints}`, subtext: 'Mapped vs Identified nodes', color: 'cyan', Icon: Globe },
+        { label: 'Security Stability', value: `${analytics.testPassRate}%`, subtext: 'Operation success rate', color: 'orange', Icon: Shield },
+        { label: 'AI Healing Efficiency', value: analytics.healedTests.toString(), subtext: 'Autonomously repaired cases', color: 'blue', Icon: CheckCircle },
+    ] : [];
 
-    const inputParams = [
-        { name: 'user_id', type: 'Required • Integer', coverage: 100, testValues: '25 test values', color: 'green' },
-        { name: 'email', type: 'Required • String', coverage: 60, testValues: '12 test values', color: 'orange' },
-        { name: 'profile_image', type: 'Optional • File', coverage: 0, testValues: '0 test values', color: 'red' },
-        { name: 'permissions', type: 'Optional • Array', coverage: 85, testValues: '17 test values', color: 'green' },
-    ];
-
-    const outputParams = [
-        { name: 'id', type: 'Always • Integer', coverage: 100, status: 'Validated', color: 'green' },
-        { name: 'created_at', type: 'Always • DateTime', coverage: 100, status: 'Validated', color: 'green' },
-        { name: 'metadata', type: 'Conditional • Object', coverage: 45, status: 'Partial validation', color: 'orange' },
-        { name: 'error_details', type: 'Error only • Object', coverage: 0, status: 'Not validated', color: 'red' },
-    ];
+    const criticalGaps = endpoints.filter(e => e.status === 'unscanned' || e.status === 'error').slice(0, 5);
 
     const getMethodBadge = (method) => {
         const colors = {
-            GET: 'bg-green-500',
-            POST: 'bg-green-400',
-            PUT: 'bg-orange-500',
-            DELETE: 'bg-red-500',
+            GET: 'bg-green-500/20 text-green-500 border-green-500',
+            POST: 'bg-cyan-light/20 text-cyan-light border-cyan-light',
+            PUT: 'bg-orange-500/20 text-orange-500 border-orange-500',
+            DELETE: 'bg-red-500/20 text-red-500 border-red-500',
         };
         return (
-            <span className={`px-2 py-0.5 ${colors[method]} text-white text-xs font-bold rounded`}>
+            <span className={`px-2 py-0.5 border ${colors[method] || 'bg-zinc-500/20 text-zinc-400 border-zinc-700'} text-xs font-bold rounded`}>
                 {method}
             </span>
         );
     };
 
+    const filteredEndpoints = endpoints.filter(e => {
+        const matchesSearch = e.path.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesMethod = methodFilter === 'All Methods' || e.method === methodFilter;
+        return matchesSearch && matchesMethod;
+    });
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-black flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 size={48} className="text-purple animate-spin" />
+                    <p className="text-gray-400">Compiling coverage audit...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen bg-black flex items-center justify-center p-8">
+                <div className="text-center">
+                    <AlertTriangle size={48} className="text-red-500 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-white mb-2">Audit Failed</h2>
+                    <p className="text-gray-400 mb-6">{error}</p>
+                    <Link to={`/project/${id}`} className="text-purple hover:underline">Return to Module Dashboard</Link>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="min-h-screen bg-black">
+        <div className="min-h-screen bg-black text-white">
             <div className="max-w-[1920px] mx-auto px-8 py-8">
                 {/* Breadcrumb */}
-                <div className="flex items-center gap-2 text-sm mb-6 text-gray-400">
-                    <Link to="/dashboard" className="hover:text-white transition-colors">Project</Link>
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest mb-6 text-zinc-500">
+                    <Link to="/projects" className="hover:text-white transition-colors">PROJECTS</Link>
                     <span>/</span>
-                    <Link to={`/project/${id}/runs`} className="hover:text-white transition-colors">Test Run</Link>
+                    <Link to={`/project/${id}`} className="hover:text-white transition-colors uppercase">{project?.name || 'NODE'}</Link>
                     <span>/</span>
-                    <span className="text-white">Coverage Report</span>
+                    <span className="text-purple-light">COVERAGE AUDIT</span>
                 </div>
 
                 {/* Back Button */}
                 <Link
-                    to={`/project/${id}/run/${runId}`}
-                    className="inline-flex items-center gap-2 text-cyan-light hover:text-cyan transition-colors mb-6"
+                    to={`/project/${id}`}
+                    className="inline-flex items-center gap-2 text-cyan-light hover:text-cyan transition-colors mb-6 text-sm font-bold uppercase tracking-tighter"
                 >
-                    <ArrowLeft size={18} />
-                    Back
+                    <ArrowLeft size={16} />
+                    Return to Overview
                 </Link>
 
                 {/* Header */}
-                <div className="flex items-center justify-between mb-8">
-                    <h1 className="text-4xl font-bold text-white">Project Coverage Report</h1>
-                    <select className="px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-purple">
-                        <option>Last Run</option>
-                        <option>Last Week</option>
-                        <option>Last Month</option>
-                    </select>
+                <div className="flex items-center justify-between mb-12">
+                    <div>
+                        <h1 className="text-5xl font-black text-white tracking-tighter mb-2">System Coverage Audit</h1>
+                        <p className="text-gray-500">Comprehensive reachability and stability analysis for {project?.name}</p>
+                    </div>
                 </div>
 
                 {/* Coverage Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
                     {coverageStats.map((stat, index) => (
-                        <div key={index} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm text-gray-400">{stat.label}</span>
-                                <span className="text-2xl">{stat.icon}</span>
+                        <div key={index} className="bg-zinc-900 border border-white/5 rounded-xl p-8 relative overflow-hidden group hover:border-purple/30 transition-all">
+                            <div className="flex items-center justify-between mb-6">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">{stat.label}</span>
+                                <stat.Icon size={20} className="text-zinc-700 group-hover:text-purple transition-colors" />
                             </div>
-                            <div className={`text-3xl font-bold text-${stat.color}-500 mb-1`}>{stat.value}</div>
-                            <div className="text-xs text-gray-500">{stat.subtext}</div>
+                            <div className={`text-5xl font-black text-white mb-2 tracking-tighter`}>{stat.value}</div>
+                            <div className="text-xs text-zinc-500 font-medium">{stat.subtext}</div>
+                            <div className={`absolute bottom-0 left-0 h-1 bg-${stat.color === 'purple' ? 'purple' : stat.color + '-light'} w-full opacity-30 group-hover:opacity-100 transition-opacity`}></div>
                         </div>
                     ))}
                 </div>
 
                 {/* Critical Coverage Gaps */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-8">
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-3">
-                            <span className="text-red-500 text-2xl">⚠</span>
-                            <h2 className="text-xl font-bold text-red-500">Critical Coverage Gaps</h2>
+                {criticalGaps.length > 0 && (
+                    <div className="bg-zinc-950 border border-red-900/30 rounded-xl p-8 mb-12 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-12 opacity-5">
+                            <AlertTriangle size={200} className="text-red-500" />
                         </div>
-                        <div className="flex items-center gap-3">
-                            <span className="text-orange-500 text-sm font-semibold">3 critical endpoints need immediate attention</span>
-                            <button className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-all">
-                                + Generate Tests for Gaps
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        {criticalGaps.map((gap, index) => (
-                            <div key={index} className="flex items-center justify-between p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                <div className="flex items-center gap-4 flex-1">
-                                    <span className="text-red-500 text-xl">●</span>
-                                    <div className="flex-1">
-                                        <div className="text-white font-mono text-sm mb-1">{gap.path}</div>
-                                        <div className="text-gray-400 text-xs">{gap.risk} - {gap.category}</div>
-                                    </div>
+                        <div className="flex items-center justify-between mb-8 relative z-10">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-red-500/10 rounded-lg">
+                                    <AlertTriangle size={24} className="text-red-500" />
                                 </div>
-                                <div className="flex items-center gap-4">
-                                    <div className="w-32 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                                        <div className="h-full bg-red-500" style={{ width: gap.coverage }}></div>
-                                    </div>
-                                    <span className="text-red-500 text-sm font-semibold w-12 text-right">{gap.coverage}</span>
+                                <div>
+                                    <h2 className="text-2xl font-black text-white tracking-tight">Vulnerability Manifest</h2>
+                                    <p className="text-red-500/60 text-sm font-bold uppercase tracking-widest">Immediate action recommended for {criticalGaps.length} nodes</p>
                                 </div>
                             </div>
-                        ))}
+                            <button className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-black text-xs uppercase tracking-widest rounded transition-all shadow-lg shadow-red-500/20">
+                                Initiate Batch Scan
+                            </button>
+                        </div>
+
+                        <div className="space-y-2 relative z-10">
+                            {criticalGaps.map((gap, index) => (
+                                <div key={index} className="flex items-center justify-between p-4 bg-black/40 border border-white/5 rounded hover:bg-black/60 transition-colors">
+                                    <div className="flex items-center gap-4 flex-1">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></div>
+                                        <div>
+                                            <div className="text-white text-sm font-mono font-bold">{gap.path}</div>
+                                            <div className="text-zinc-600 text-[10px] font-black uppercase tracking-widest">RISK: HIGH • STATUS: {gap.status}</div>
+                                        </div>
+                                    </div>
+                                    <Link to={`/project/${id}/endpoints`} className="text-red-500 font-black text-[10px] uppercase tracking-widest hover:text-white transition-colors">
+                                        Analyze Gap →
+                                    </Link>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
 
-                {/* Endpoint Coverage Details */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-8">
-                    <h2 className="text-xl font-bold text-white mb-6">Endpoint Coverage Details</h2>
+                {/* Detailed Manifest */}
+                <div className="bg-zinc-900 border border-white/5 rounded-2xl p-8 shadow-2xl">
+                    <div className="flex items-center justify-between mb-8">
+                        <h2 className="text-2xl font-black text-white tracking-tight uppercase">Detailed Manifest Analysis</h2>
 
-                    {/* Filters */}
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                        <select
-                            value={methodFilter}
-                            onChange={(e) => setMethodFilter(e.target.value)}
-                            className="px-4 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-purple"
-                        >
-                            <option>All Methods</option>
-                            <option>GET</option>
-                            <option>POST</option>
-                            <option>PUT</option>
-                            <option>DELETE</option>
-                        </select>
-
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-4 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-purple"
-                        >
-                            <option>All Status</option>
-                            <option>Covered</option>
-                            <option>Partial</option>
-                            <option>Not Covered</option>
-                        </select>
-
-                        <div className="relative">
-                            <input
-                                type="text"
-                                placeholder="Search endpoints..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full px-4 py-2 pl-10 bg-zinc-950 border border-zinc-800 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-purple"
-                            />
-                            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                                <input
+                                    type="text"
+                                    placeholder="SEARCH PROTOCOLS..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="px-10 py-2.5 bg-black border border-white/10 rounded text-xs font-bold uppercase tracking-widest focus:border-purple transition-all w-64"
+                                />
+                            </div>
+                            <select
+                                value={methodFilter}
+                                onChange={(e) => setMethodFilter(e.target.value)}
+                                className="px-4 py-2.5 bg-black border border-white/10 rounded text-xs font-bold uppercase tracking-widest focus:border-purple transition-all appearance-none cursor-pointer"
+                            >
+                                <option>All Methods</option>
+                                <option>GET</option>
+                                <option>POST</option>
+                                <option>PUT</option>
+                                <option>DELETE</option>
+                            </select>
                         </div>
                     </div>
 
-                    {/* Table */}
                     <div className="overflow-x-auto">
-                        <table className="w-full">
+                        <table className="w-full text-left">
                             <thead>
-                                <tr className="border-b border-zinc-800">
-                                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                        <div className="flex items-center gap-2">
-                                            Endpoint Path
-                                            <ChevronDown size={14} />
-                                        </div>
-                                    </th>
-                                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                        <div className="flex items-center gap-2">
-                                            Methods
-                                            <ChevronDown size={14} />
-                                        </div>
-                                    </th>
-                                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                        <div className="flex items-center gap-2">
-                                            Coverage
-                                            <ChevronDown size={14} />
-                                        </div>
-                                    </th>
-                                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                        <div className="flex items-center gap-2">
-                                            Parameters
-                                            <ChevronDown size={14} />
-                                        </div>
-                                    </th>
-                                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                        Actions
-                                    </th>
+                                <tr className="border-b border-white/5">
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-zinc-500">Node Identification</th>
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-zinc-500">Method Pool</th>
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-zinc-500">Verification Status</th>
+                                    <th className="px-6 py-4"></th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {endpoints.map((endpoint, index) => (
-                                    <tr key={index} className="border-b border-zinc-800 hover:bg-white/[0.02] transition-colors">
-                                        <td className="px-4 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <ChevronDown size={16} className="text-gray-500" />
-                                                <span className="text-white font-mono text-sm">{endpoint.path}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <div className="flex items-center gap-2">
-                                                {endpoint.methods.map((method, i) => (
-                                                    <span key={i}>{getMethodBadge(method)}</span>
-                                                ))}
-                                                <span className="text-gray-400 text-xs ml-2">{endpoint.methodCount}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-24 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                                                        <div
-                                                            className={`h-full ${endpoint.coverage >= 80 ? 'bg-blue-500' : endpoint.coverage >= 50 ? 'bg-purple-500' : 'bg-red-500'}`}
-                                                            style={{ width: `${endpoint.coverage}%` }}
-                                                        ></div>
-                                                    </div>
-                                                    <span className="text-white text-sm font-semibold">{endpoint.coverage}%</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-24 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                                                        <div
-                                                            className={`h-full ${endpoint.paramCoverage >= 80 ? 'bg-purple-500' : endpoint.paramCoverage >= 50 ? 'bg-blue-500' : 'bg-red-500'}`}
-                                                            style={{ width: `${endpoint.paramCoverage}%` }}
-                                                        ></div>
-                                                    </div>
-                                                    <span className="text-white text-sm font-semibold">{endpoint.paramCoverage}%</span>
-                                                </div>
-                                                <div className="text-gray-400 text-xs">{endpoint.params}</div>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <button className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">
-                                                <Eye size={18} className="text-gray-400" />
-                                            </button>
+                                {filteredEndpoints.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="4" className="px-6 py-20 text-center text-zinc-600 italic text-sm">
+                                            No nodes matching your query criteria were found in the manifest.
                                         </td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    filteredEndpoints.map((endpoint, index) => (
+                                        <tr key={index} className="border-b border-white/5 hover:bg-white/[0.01] transition-colors group">
+                                            <td className="px-6 py-4">
+                                                <div className="text-white font-mono text-xs font-bold">{endpoint.path}</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {getMethodBadge(endpoint.method)}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="flex-1 max-w-[150px] h-1 bg-zinc-800 rounded-full overflow-hidden">
+                                                        <div
+                                                            className={`h-full ${endpoint.status === 'scanned' ? 'bg-purple' : 'bg-zinc-700'}`}
+                                                            style={{ width: endpoint.status === 'scanned' ? '100%' : '5%' }}
+                                                        ></div>
+                                                    </div>
+                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${endpoint.status === 'scanned' ? 'text-purple' : 'text-zinc-600'}`}>
+                                                        {endpoint.status}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <Link
+                                                    to={`/project/${id}/endpoints`}
+                                                    className="p-2 bg-white/5 rounded hover:bg-purple hover:text-white transition-all inline-block"
+                                                >
+                                                    <Eye size={14} />
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                {/* Parameter Coverage Analysis */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                    <h2 className="text-xl font-bold text-white mb-6">Parameter Coverage Analysis</h2>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Input Parameters */}
-                        <div>
-                            <h3 className="text-lg font-semibold text-purple-light mb-4">Input Parameters</h3>
-                            <div className="space-y-3">
-                                {inputParams.map((param, index) => (
-                                    <div key={index} className="p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div>
-                                                <div className="text-white font-mono text-sm mb-1">{param.name}</div>
-                                                <div className="text-gray-400 text-xs">{param.type}</div>
-                                            </div>
-                                            <span className={`text-${param.color}-500 text-sm font-semibold`}>{param.coverage}%</span>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                                                <div className={`h-full bg-${param.color}-500`} style={{ width: `${param.coverage}%` }}></div>
-                                            </div>
-                                            <span className="text-gray-500 text-xs">{param.testValues}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Output Parameters */}
-                        <div>
-                            <h3 className="text-lg font-semibold text-cyan-light mb-4">Output Parameters</h3>
-                            <div className="space-y-3">
-                                {outputParams.map((param, index) => (
-                                    <div key={index} className="p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div>
-                                                <div className="text-white font-mono text-sm mb-1">{param.name}</div>
-                                                <div className="text-gray-400 text-xs">{param.type}</div>
-                                            </div>
-                                            <span className={`text-${param.color}-500 text-sm font-semibold`}>{param.coverage}%</span>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                                                <div className={`h-full bg-${param.color}-500`} style={{ width: `${param.coverage}%` }}></div>
-                                            </div>
-                                            <span className="text-gray-500 text-xs">{param.status}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                {/* Aggregate Summary */}
+                <div className="grid grid-cols-3 gap-8 mt-12 bg-zinc-950 border border-white/5 rounded-xl p-10">
+                    <div className="text-center group">
+                        <div className="text-6xl font-black text-white mb-2 group-hover:text-purple transition-colors">{analytics?.coveragePercent || 0}%</div>
+                        <div className="text-xs font-black uppercase tracking-[0.2em] text-zinc-600">Aggregate Integrity</div>
                     </div>
-
-                    {/* Coverage Summary */}
-                    <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-zinc-800">
-                        <div className="text-center">
-                            <div className="text-3xl font-bold text-green-500 mb-1">82%</div>
-                            <div className="text-sm text-gray-400">Required Parameters</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-3xl font-bold text-orange-500 mb-1">65%</div>
-                            <div className="text-sm text-gray-400">Optional Parameters</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-3xl font-bold text-cyan-light mb-1">73%</div>
-                            <div className="text-sm text-gray-400">Output Validation</div>
-                        </div>
+                    <div className="text-center group">
+                        <div className="text-6xl font-black text-white mb-2 group-hover:text-cyan-light transition-colors">{Math.round((analytics?.coveredEndpoints || 0) / (analytics?.totalEndpoints || 1) * 100)}%</div>
+                        <div className="text-xs font-black uppercase tracking-[0.2em] text-zinc-600">Node Registration</div>
+                    </div>
+                    <div className="text-center group">
+                        <div className="text-6xl font-black text-white mb-2 group-hover:text-orange-500 transition-colors">{analytics?.testPassRate || 0}%</div>
+                        <div className="text-xs font-black uppercase tracking-[0.2em] text-zinc-600">Protocol Stability</div>
                     </div>
                 </div>
             </div>

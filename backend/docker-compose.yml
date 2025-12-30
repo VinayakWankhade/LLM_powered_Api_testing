@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: always
+
+# In Phase 7/8, we might add a DB and celery worker here too.
+# For now, this just gives the beginner a way to start Redis.

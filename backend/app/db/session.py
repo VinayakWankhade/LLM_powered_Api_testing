@@ -1,15 +1,35 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
-from app.core.config import settings
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from typing import AsyncGenerator
 
-engine = create_async_engine(settings.DATABASE_URL, echo=True)
+from app.config import settings
 
-AsyncSessionLocal = sessionmaker(
-    engine, class_=AsyncSession, expire_on_commit=False
+# 1. Create the engine - the central connection to our DB
+# echo=True means it will print every SQL command to our terminal (good for debugging)
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=settings.DEBUG,
+    future=True
 )
 
-Base = declarative_base()
+# 2. Create a session maker - a factory that gives us connections
+async_session_maker = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
-async def get_db():
-    async with AsyncSessionLocal() as session:
-        yield session
+# 3. Create a dependency - this is what our API routes will use
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Dependency function to get a database session.
+    
+    Why this?
+    FastAPI uses this to give each request its own DB connection. 
+    The 'yield' ensures the connection is closed automatically after 
+     the request is finished.
+    """
+    async with async_session_maker() as session:
+        try:
+            yield session
+        finally:
+            await session.close()

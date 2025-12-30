@@ -1,236 +1,299 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, User, Bell, Shield, Key, Upload } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, User, Bell, Shield, Key, Upload, Loader2, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
+import { authApi } from '../api';
 
 const UserSettings = () => {
+    const navigate = useNavigate();
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [activeTab, setActiveTab] = useState('profile');
-    const [mfaEnabled, setMfaEnabled] = useState(false);
-    const [notifications, setNotifications] = useState({
-        criticalErrors: true,
-        weeklyActivity: false,
-        testCompletion: true,
-        securityUpdates: true,
+    const [user, setUser] = useState(null);
+    const [error, setError] = useState(null);
+    const [success, setSuccess] = useState(null);
+
+    const [notificationPreferences, setNotificationPreferences] = useState({
+        critical_alert: true,
+        weekly_summary: false,
+        test_execution: true,
     });
 
+    useEffect(() => {
+        fetchUser();
+    }, []);
+
+    const fetchUser = async () => {
+        try {
+            setLoading(true);
+            const data = await authApi.verify();
+            setUser(data.user);
+            setFormData({
+                firstName: data.user.firstName || '',
+                lastName: data.user.lastName || '',
+            });
+            if (data.user.notificationPreferences) {
+                setNotificationPreferences({
+                    critical_alert: data.user.notificationPreferences.critical_alert ?? true,
+                    weekly_summary: data.user.notificationPreferences.weekly_summary ?? false,
+                    test_execution: data.user.notificationPreferences.test_execution ?? true,
+                });
+            }
+        } catch (err) {
+            console.error("Failed to load user profile:", err);
+            setError("Identity verification failed. Please re-authenticate.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUpdateProfile = async (e) => {
+        e.preventDefault();
+        // ... (existing logic)
+    };
+
+    const handleNotificationToggle = async (key) => {
+        const newPrefs = { ...notificationPreferences, [key]: !notificationPreferences[key] };
+        setNotificationPreferences(newPrefs);
+
+        try {
+            await authApi.updateProfile({ notification_preferences: newPrefs });
+        } catch (err) {
+            console.error("Failed to update preferences:", err);
+            // Revert on failure
+            setNotificationPreferences(notificationPreferences);
+        }
+    };
+
+    const handleToggleMFA = async () => {
+        try {
+            const newState = !user.mfaEnabled;
+            await authApi.updateProfile({ mfa_enabled: newState });
+            setUser({ ...user, mfaEnabled: newState });
+            setSuccess(`Multi-Factor Authentication ${newState ? 'Enabled' : 'Disabled'}`);
+            setTimeout(() => setSuccess(null), 3000);
+        } catch (err) {
+            console.error("Failed to toggle MFA:", err);
+            setError("Failed to update security settings.");
+        }
+    };
+
+    // ... (rendering logic)
+
+    // In Notifications Tab:
+    // ...
+
+    // In Security Tab:
+    // ...
+    <div className="p-6 bg-black/50 border border-white/5 rounded-3xl text-center">
+        <p className="text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-2">MFA Matrix</p>
+        <button onClick={handleToggleMFA} className={`text-lg font-black italic uppercase tracking-tighter ${user?.mfaEnabled ? 'text-green-500' : 'text-red-500'}`}>
+            {user?.mfaEnabled ? 'Active' : 'Deactivated'}
+        </button>
+    </div>
+
+
+    if (loading && !user) {
+        return (
+            <div className="min-h-screen bg-black flex items-center justify-center">
+                <Loader2 className="text-purple animate-spin" size={40} />
+            </div>
+        );
+    }
+
+    const initials = user ? `${user.firstName?.charAt(0) || ''}${user.lastName?.charAt(0) || ''}` : '??';
+
     return (
-        <div className="min-h-screen bg-black">
-            <div className="max-w-[1920px] mx-auto px-8 py-8">
+        <div className="min-h-screen bg-black text-white selection:bg-purple/30">
+            <div className="max-w-[1400px] mx-auto px-8 py-12 relative">
+                {/* Background Glow */}
+                <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-purple/5 blur-[120px] pointer-events-none rounded-full"></div>
+
                 {/* Header */}
-                <div className="mb-8">
+                <div className="mb-12">
                     <Link
                         to="/dashboard"
-                        className="inline-flex items-center gap-2 text-cyan-light hover:text-cyan transition-colors mb-4"
+                        className="inline-flex items-center gap-2 text-zinc-500 hover:text-white transition-all mb-4 text-[10px] font-black uppercase tracking-[0.2em] group"
                     >
-                        <ArrowLeft size={18} />
-                        Back to Dashboard
+                        <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+                        Neural Core
                     </Link>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                         <div>
-                            <div className="flex items-center gap-3 mb-2">
-                                <h1 className="text-4xl font-bold text-white">User Profile Settings</h1>
-                                <div className="flex items-center gap-2 px-3 py-1 bg-green-500/20 border border-green-500 rounded-full">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                    <span className="text-green-500 text-sm font-semibold">Active / Verified Account</span>
+                            <div className="flex items-center gap-4 mb-2">
+                                <h1 className="text-5xl font-black italic uppercase tracking-tighter">Command Center</h1>
+                                <div className="flex items-center gap-2 px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full">
+                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
+                                    <span className="text-green-500 text-[10px] font-black uppercase tracking-widest">Authenticated</span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 text-gray-400">
-                                <span>Dashboard</span>
-                                <span>/</span>
-                                <span>Profile</span>
-                            </div>
+                            <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Manage your identity and platform preferences</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
                     {/* Sidebar */}
                     <div className="lg:col-span-1">
-                        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                            <h2 className="text-white font-semibold mb-4">Settings</h2>
-                            <nav className="space-y-2">
+                        <div className="sticky top-12 space-y-2">
+                            {[
+                                { id: 'profile', icon: User, label: 'Neural Profile' },
+                                { id: 'notifications', icon: Bell, label: 'Alert Config' },
+                                { id: 'security', icon: Shield, label: 'Vault Safety' }
+                            ].map((tab) => (
                                 <button
-                                    onClick={() => setActiveTab('profile')}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'profile'
-                                        ? 'bg-purple text-white'
-                                        : 'text-gray-400 hover:bg-zinc-800 hover:text-white'
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`w-full flex items-center justify-between px-6 py-4 rounded-2xl transition-all border group ${activeTab === tab.id
+                                        ? 'bg-purple border-purple-light/20 text-white shadow-xl shadow-purple/20'
+                                        : 'bg-zinc-900/40 border-white/5 text-zinc-500 hover:text-white hover:border-white/10'
                                         }`}
                                 >
-                                    <User size={18} />
-                                    <span>Profile</span>
+                                    <div className="flex items-center gap-4">
+                                        <tab.icon size={18} className={activeTab === tab.id ? 'text-white' : 'group-hover:text-purple transition-colors'} />
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">{tab.label}</span>
+                                    </div>
+                                    {activeTab === tab.id && <div className="w-1.5 h-1.5 bg-white rounded-full"></div>}
                                 </button>
-                                <button
-                                    onClick={() => setActiveTab('notifications')}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'notifications'
-                                        ? 'bg-purple text-white'
-                                        : 'text-gray-400 hover:bg-zinc-800 hover:text-white'
-                                        }`}
+                            ))}
+
+                            <div className="pt-8 mt-8 border-t border-white/5">
+                                <Link
+                                    to="/api-keys"
+                                    className="w-full flex items-center gap-4 px-6 py-4 bg-zinc-900/20 border border-white/5 text-zinc-500 hover:text-white hover:border-purple/30 rounded-2xl transition-all group"
                                 >
-                                    <Bell size={18} />
-                                    <span>Notifications</span>
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('security')}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'security'
-                                        ? 'bg-purple text-white'
-                                        : 'text-gray-400 hover:bg-zinc-800 hover:text-white'
-                                        }`}
-                                >
-                                    <Shield size={18} />
-                                    <span>Security Settings</span>
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('api-keys')}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'api-keys'
-                                        ? 'bg-purple text-white'
-                                        : 'text-gray-400 hover:bg-zinc-800 hover:text-white'
-                                        }`}
-                                >
-                                    <Key size={18} />
-                                    <span>API Keys</span>
-                                </button>
-                            </nav>
+                                    <Key size={18} className="group-hover:text-purple transition-colors" />
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">Key Management</span>
+                                    <ExternalLink size={12} className="ml-auto opacity-30" />
+                                </Link>
+                            </div>
                         </div>
                     </div>
 
                     {/* Main Content */}
                     <div className="lg:col-span-3">
+                        {error && (
+                            <div className="mb-8 p-5 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-4">
+                                <AlertTriangle size={20} className="text-red-500" />
+                                <p className="text-red-500 text-[10px] font-black uppercase tracking-widest">{error}</p>
+                            </div>
+                        )}
+
+                        {success && (
+                            <div className="mb-8 p-5 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-center gap-4">
+                                <CheckCircle2 size={20} className="text-green-500" />
+                                <p className="text-green-500 text-[10px] font-black uppercase tracking-widest">{success}</p>
+                            </div>
+                        )}
+
                         {/* Profile Tab */}
                         {activeTab === 'profile' && (
-                            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-                                <div className="flex items-start gap-8 mb-8">
-                                    <div className="relative">
-                                        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-purple to-cyan-light p-1">
-                                            <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center text-4xl">
-                                                👤
+                            <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-[40px] p-12 shadow-2xl">
+                                <div className="flex items-center gap-10 mb-12">
+                                    <div className="relative group">
+                                        <div className="w-32 h-32 rounded-[40px] bg-gradient-to-br from-purple to-cyan-light p-1 shadow-2xl shadow-purple/20 rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                                            <div className="w-full h-full rounded-[38px] bg-zinc-950 flex items-center justify-center text-3xl font-black italic text-white tracking-tighter">
+                                                {initials}
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="flex-1">
-                                        <h2 className="text-2xl font-bold text-white mb-1">Jane Doe</h2>
-                                        <p className="text-gray-400 mb-4">Frontend Developer</p>
-                                        <button className="flex items-center gap-2 px-4 py-2 bg-purple hover:bg-purple-dark text-white font-semibold rounded-lg transition-all">
-                                            <Upload size={18} />
-                                            Change Avatar
+                                        <button className="absolute -bottom-2 -right-2 w-10 h-10 bg-white text-black rounded-xl flex items-center justify-center shadow-xl hover:scale-110 transition-all border-4 border-zinc-900">
+                                            <Upload size={16} />
                                         </button>
                                     </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <label className="block text-sm text-gray-400 mb-2">Full Name</label>
-                                        <input
-                                            type="text"
-                                            defaultValue="Jane Doe"
-                                            className="w-full px-4 py-3 bg-black border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-purple"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-gray-400 mb-2">Role / Title</label>
-                                        <input
-                                            type="text"
-                                            defaultValue="Frontend Developer"
-                                            className="w-full px-4 py-3 bg-black border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-purple"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-gray-400 mb-2">Email Address</label>
-                                        <input
-                                            type="email"
-                                            defaultValue="jane.doe@example.com"
-                                            className="w-full px-4 py-3 bg-black border border-zinc-800 rounded-lg text-gray-500 cursor-not-allowed"
-                                            disabled
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-gray-400 mb-2">Timezone</label>
-                                        <select className="w-full px-4 py-3 bg-black border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-purple">
-                                            <option>(GMT-05:00) Eastern Time</option>
-                                            <option>(GMT-08:00) Pacific Time</option>
-                                            <option>(GMT+00:00) UTC</option>
-                                            <option>(GMT+05:30) India Standard Time</option>
-                                        </select>
+                                        <h2 className="text-3xl font-black italic uppercase tracking-tighter text-white mb-2">{user.firstName} {user.lastName}</h2>
+                                        <div className="flex items-center gap-3 text-zinc-500">
+                                            <span className="text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10 px-3 py-1 rounded-full">{user.role}</span>
+                                            <span className="text-zinc-700">•</span>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest">{user.email}</span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-zinc-800">
-                                    <button className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-all">
-                                        Cancel
-                                    </button>
-                                    <button className="px-6 py-2 bg-cyan-light hover:bg-cyan text-black font-semibold rounded-lg transition-all">
-                                        Update Profile
-                                    </button>
-                                </div>
+                                <form onSubmit={handleUpdateProfile} className="space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">First Identity</label>
+                                            <input
+                                                type="text"
+                                                value={formData.firstName}
+                                                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                                                className="w-full px-6 py-4 bg-black/50 border border-white/10 rounded-2xl text-white outline-none focus:border-purple transition-all font-bold"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Last Identity</label>
+                                            <input
+                                                type="text"
+                                                value={formData.lastName}
+                                                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                                                className="w-full px-6 py-4 bg-black/50 border border-white/10 rounded-2xl text-white outline-none focus:border-purple transition-all font-bold"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Verified Email</label>
+                                            <input
+                                                type="email"
+                                                value={user.email}
+                                                disabled
+                                                className="w-full px-6 py-4 bg-zinc-950 border border-white/5 rounded-2xl text-zinc-600 font-bold cursor-not-allowed italic"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Temporal Zone</label>
+                                            <select className="w-full px-6 py-4 bg-black/50 border border-white/10 rounded-2xl text-white outline-none focus:border-purple transition-all font-bold appearance-none cursor-pointer">
+                                                <option>Digital Nomad / UTC</option>
+                                                <option>Eastern Grid / GMT-5</option>
+                                                <option>Pacific Grid / GMT-8</option>
+                                                <option>Standard India / GMT+5:30</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-end gap-4 pt-8 border-t border-white/5">
+                                        <button
+                                            type="button"
+                                            onClick={() => window.location.reload()}
+                                            className="px-8 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 hover:text-white transition-all"
+                                        >
+                                            Revert Logic
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={saving}
+                                            className="px-10 py-4 bg-purple hover:bg-purple-dark disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-[0.3em] rounded-2xl transition-all shadow-xl shadow-purple/20 flex items-center gap-3"
+                                        >
+                                            {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                                            Commit Changes
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
                         )}
 
                         {/* Notifications Tab */}
                         {activeTab === 'notifications' && (
-                            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-                                <h2 className="text-2xl font-bold text-white mb-6">Email & Platform Preferences</h2>
-
-                                <div className="space-y-6">
-                                    <div className="flex items-center justify-between p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                        <div>
-                                            <h3 className="text-white font-semibold mb-1">Critical Error Notifications</h3>
-                                            <p className="text-gray-400 text-sm">Get notified by email for critical system errors.</p>
+                            <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-[40px] p-12 shadow-2xl">
+                                <h2 className="text-2xl font-black italic uppercase tracking-tighter text-white mb-8">Alert Protocols</h2>
+                                <div className="space-y-4">
+                                    {[
+                                        { id: 'critical_alert', label: 'Critical System Failures', desc: 'Real-time alerts for backend crashes and scan errors' },
+                                        { id: 'weekly_summary', label: 'Weekly Summary Uplink', desc: 'Aggregated analytics report delivered every cycle' },
+                                        { id: 'test_execution', label: 'Test Execution Sync', desc: 'Passive alerts when test suites finish processing' }
+                                    ].map((proto) => (
+                                        <div key={proto.id}
+                                            onClick={() => handleNotificationToggle(proto.id)}
+                                            className="flex items-center justify-between p-6 bg-black/30 border border-white/5 rounded-3xl group hover:border-white/10 transition-all cursor-pointer">
+                                            <div>
+                                                <h3 className="text-xs font-black text-white uppercase tracking-widest mb-1">{proto.label}</h3>
+                                                <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">{proto.desc}</p>
+                                            </div>
+                                            <div className={`w-12 h-6 rounded-full relative transition-colors ${notificationPreferences[proto.id] ? 'bg-purple' : 'bg-zinc-800'}`}>
+                                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${notificationPreferences[proto.id] ? 'left-7' : 'left-1'}`}></div>
+                                            </div>
                                         </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={notifications.criticalErrors}
-                                                onChange={(e) => setNotifications({ ...notifications, criticalErrors: e.target.checked })}
-                                                className="sr-only peer"
-                                            />
-                                            <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple"></div>
-                                        </label>
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                        <div>
-                                            <h3 className="text-white font-semibold mb-1">Weekly Activity Summary</h3>
-                                            <p className="text-gray-400 text-sm">Receive a weekly summary of your project activities.</p>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={notifications.weeklyActivity}
-                                                onChange={(e) => setNotifications({ ...notifications, weeklyActivity: e.target.checked })}
-                                                className="sr-only peer"
-                                            />
-                                            <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple"></div>
-                                        </label>
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                        <div>
-                                            <h3 className="text-white font-semibold mb-1">In-app Test Completion Alerts</h3>
-                                            <p className="text-gray-400 text-sm">Show alerts inside the app when test runs are complete.</p>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={notifications.testCompletion}
-                                                onChange={(e) => setNotifications({ ...notifications, testCompletion: e.target.checked })}
-                                                className="sr-only peer"
-                                            />
-                                            <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple"></div>
-                                        </label>
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                        <div>
-                                            <h3 className="text-white font-semibold mb-1">Security Update Notifications</h3>
-                                            <p className="text-gray-400 text-sm">Get notified about important security updates and changes.</p>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={notifications.securityUpdates}
-                                                onChange={(e) => setNotifications({ ...notifications, securityUpdates: e.target.checked })}
-                                                className="sr-only peer"
-                                            />
-                                            <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple"></div>
-                                        </label>
+                                    ))}
+                                    <div className="mt-8 p-6 bg-purple/10 border border-purple/20 rounded-2xl">
+                                        <p className="text-purple text-[10px] font-black uppercase tracking-widest text-center italic">Protocol customization coming in Nexus Update 2.0</p>
                                     </div>
                                 </div>
                             </div>
@@ -238,365 +301,45 @@ const UserSettings = () => {
 
                         {/* Security Tab */}
                         {activeTab === 'security' && (
-                            <div className="space-y-6">
-                                {/* Security Scorecard */}
-                                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-                                    <h2 className="text-purple-light text-xl font-bold mb-6">Security Scorecard</h2>
-
-                                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                                        <div className="flex flex-col items-center">
-                                            <svg viewBox="0 0 120 120" className="w-32 h-32">
-                                                <circle cx="60" cy="60" r="50" fill="none" stroke="#27272a" strokeWidth="10" />
-                                                <circle
-                                                    cx="60"
-                                                    cy="60"
-                                                    r="50"
-                                                    fill="none"
-                                                    stroke="#f97316"
-                                                    strokeWidth="10"
-                                                    strokeDasharray="188.4"
-                                                    strokeDashoffset="75.36"
-                                                    transform="rotate(-90 60 60)"
-                                                />
-                                                <text x="60" y="60" textAnchor="middle" dy="7" fill="#f97316" fontSize="24" fontWeight="bold">
-                                                    60%
-                                                </text>
-                                            </svg>
-                                            <p className="text-white font-semibold mt-2">Medium Security</p>
-                                            <p className="text-gray-400 text-xs">Complete actions to improve your score.</p>
-                                        </div>
-
-                                        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <div className="text-center p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                                <div className="text-red-500 text-sm font-semibold mb-1">MFA Status</div>
-                                                <div className="text-white text-2xl font-bold mb-1">Disabled</div>
-                                                <div className="text-gray-500 text-xs">Highly recommended</div>
-                                            </div>
-                                            <div className="text-center p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                                <div className="text-gray-400 text-sm font-semibold mb-1">Password Age</div>
-                                                <div className="text-white text-2xl font-bold mb-1">125 days</div>
-                                                <div className="text-gray-500 text-xs">Consider updating</div>
-                                            </div>
-                                            <div className="text-center p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                                <div className="text-gray-400 text-sm font-semibold mb-1">Active Sessions</div>
-                                                <div className="text-white text-2xl font-bold mb-1">3</div>
-                                                <div className="text-gray-500 text-xs">Review recent activity</div>
-                                            </div>
+                            <div className="space-y-8">
+                                <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-[40px] p-12 shadow-2xl">
+                                    <div className="flex items-center justify-between mb-8">
+                                        <h2 className="text-2xl font-black italic uppercase tracking-tighter text-white">Security Vitals</h2>
+                                        <div className="text-orange-500 flex items-center gap-2">
+                                            <AlertTriangle size={18} />
+                                            <span className="text-[10px] font-black uppercase tracking-widest">Enhanced Shielding Recommended</span>
                                         </div>
                                     </div>
 
-                                    <div className="mt-6 p-4 bg-cyan/10 border border-cyan rounded-lg">
-                                        <h3 className="text-cyan-light font-semibold mb-2">Recommended Actions</h3>
-                                        <ul className="space-y-1 text-sm">
-                                            <li className="text-orange-500">• Enable Multi-Factor Authentication</li>
-                                            <li className="text-white">• Change your password regularly</li>
-                                            <li className="text-white">• Revoke unused sessions</li>
-                                        </ul>
-                                    </div>
-                                </div>
-
-                                {/* Password Management & MFA */}
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    {/* Password Management */}
-                                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                                        <h3 className="text-purple-light font-semibold mb-4">Password Management</h3>
-                                        <p className="text-gray-400 text-sm mb-6">For security, your password should be changed periodically.</p>
-
-                                        <div className="space-y-4">
-                                            <div>
-                                                <label className="block text-sm text-gray-400 mb-2">Current Password</label>
-                                                <input
-                                                    type="password"
-                                                    placeholder="Enter current password"
-                                                    className="w-full px-4 py-3 bg-black border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-purple"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm text-gray-400 mb-2">New Password</label>
-                                                <input
-                                                    type="password"
-                                                    placeholder="Enter new password"
-                                                    className="w-full px-4 py-3 bg-black border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-purple"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm text-gray-400 mb-2">Confirm New Password</label>
-                                                <input
-                                                    type="password"
-                                                    placeholder="Confirm new password"
-                                                    className="w-full px-4 py-3 bg-black border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-purple"
-                                                />
-                                            </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                                        <div className="p-6 bg-black/50 border border-white/5 rounded-3xl text-center">
+                                            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-2">MFA Matrix</p>
+                                            <p className="text-red-500 text-lg font-black italic uppercase tracking-tighter">Deactivated</p>
                                         </div>
-
-                                        <div className="mt-4 text-xs text-gray-500">
-                                            <p className="mb-1">Password must contain:</p>
-                                            <ul className="list-disc list-inside space-y-1">
-                                                <li>At least 8 characters</li>
-                                                <li>An uppercase and a lowercase letter</li>
-                                                <li>At least one number & one special character</li>
-                                            </ul>
+                                        <div className="p-6 bg-black/50 border border-white/5 rounded-3xl text-center">
+                                            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-2">Credential Age</p>
+                                            <p className="text-white text-lg font-black italic uppercase tracking-tighter">{Math.floor((Date.now() - new Date(user.created_at).getTime()) / (1000 * 60 * 60 * 24))} Days</p>
                                         </div>
-
-                                        <button className="w-full mt-6 px-4 py-2 bg-purple hover:bg-purple-dark text-white font-semibold rounded-lg transition-all">
-                                            Change Password
-                                        </button>
-                                    </div>
-
-                                    {/* MFA */}
-                                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                                        <h3 className="text-purple-light font-semibold mb-4">Multi-Factor Authentication (MFA)</h3>
-                                        <p className="text-gray-400 text-sm mb-6">Add an extra layer of security to your account.</p>
-
-                                        <div className="flex items-center justify-between mb-6 p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                            <div>
-                                                <p className="text-white font-semibold">MFA Status</p>
-                                                <p className="text-red-500 text-sm">Currently Disabled. Toggle to enable</p>
-                                            </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={mfaEnabled}
-                                                    onChange={(e) => setMfaEnabled(e.target.checked)}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                                            </label>
+                                        <div className="p-6 bg-black/50 border border-white/5 rounded-3xl text-center">
+                                            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-wider mb-2">Neural Links</p>
+                                            <p className="text-purple text-lg font-black italic uppercase tracking-tighter">Verified</p>
                                         </div>
-
-                                        {mfaEnabled && (
-                                            <div className="space-y-4">
-                                                <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                                    <h4 className="text-white font-semibold mb-3 flex items-center gap-2">
-                                                        <span>📱</span>
-                                                        Authenticator App
-                                                    </h4>
-                                                    <ol className="text-sm text-gray-400 space-y-2 mb-4">
-                                                        <li>1. Install an authenticator app like Google Authenticator or Authy.</li>
-                                                        <li>2. Scan this QR code with your app.</li>
-                                                    </ol>
-                                                    <div className="w-48 h-48 bg-white rounded-lg mx-auto mb-4 flex items-center justify-center">
-                                                        <span className="text-6xl">📱</span>
-                                                    </div>
-                                                    <div className="mb-4">
-                                                        <label className="block text-sm text-gray-400 mb-2">3. Enter the 6-digit code from your app below to verify.</label>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="- - - - - -"
-                                                            maxLength="6"
-                                                            className="w-full px-4 py-3 bg-black border border-zinc-800 rounded-lg text-white text-center text-2xl tracking-widest focus:outline-none focus:border-purple"
-                                                        />
-                                                    </div>
-                                                    <button className="w-full px-4 py-2 bg-purple hover:bg-purple-dark text-white font-semibold rounded-lg transition-all">
-                                                        Verify & Enable
-                                                    </button>
-                                                </div>
-
-                                                <div className="p-4 bg-red-900/20 border border-red-700 rounded-lg">
-                                                    <div className="flex items-start gap-2 mb-2">
-                                                        <span>🛡️</span>
-                                                        <div>
-                                                            <h4 className="text-white font-semibold">Recovery Codes</h4>
-                                                            <p className="text-gray-400 text-sm">Store these codes in a safe place. They can be used to access your account if you lose your device.</p>
-                                                        </div>
-                                                    </div>
-                                                    <button className="mt-3 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm rounded-lg transition-all">
-                                                        View Codes
-                                                    </button>
-                                                </div>
-
-                                                <button className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-all">
-                                                    Disable MFA
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Activity Log */}
-                                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-                                    <div className="flex items-center justify-between mb-6">
-                                        <h2 className="text-purple-light text-xl font-bold">Active Login Sessions</h2>
-                                        <button className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition-all">
-                                            <span>⊗</span>
-                                            Revoke All Except Current
-                                        </button>
-                                    </div>
-                                    <p className="text-gray-400 text-sm mb-6">This is a list of devices that have logged into your account.</p>
-
-                                    {/* Table Header */}
-                                    <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-lg mb-3 text-sm font-semibold text-cyan-light">
-                                        <div className="col-span-4">Device</div>
-                                        <div className="col-span-3">Location</div>
-                                        <div className="col-span-3">Last Activity</div>
-                                        <div className="col-span-2">Login Time</div>
                                     </div>
 
-                                    {/* Sessions List */}
-                                    <div className="space-y-2">
-                                        {/* Current Session */}
-                                        <div className="grid grid-cols-12 gap-4 px-4 py-4 bg-zinc-950 border-2 border-green-500 rounded-lg items-center">
-                                            <div className="col-span-4 flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-zinc-900 border border-zinc-700 rounded-lg flex items-center justify-center">
-                                                    <span className="text-xl">💻</span>
+                                    <div className="space-y-6">
+                                        <div className="p-8 bg-zinc-950/50 border border-white/5 rounded-[32px] flex items-center justify-between group hover:border-purple/30 transition-all">
+                                            <div className="flex items-center gap-6">
+                                                <div className="w-12 h-12 rounded-2xl bg-black border border-white/10 flex items-center justify-center">
+                                                    <Key size={20} className="text-purple" />
                                                 </div>
                                                 <div>
-                                                    <p className="text-white font-semibold">Chrome on Windows</p>
-                                                    <p className="text-green-500 text-xs font-semibold">Current Session</p>
+                                                    <h3 className="text-sm font-black text-white uppercase tracking-widest mb-1">Developer API Forge</h3>
+                                                    <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest italic">Provision and decommission system access tokens</p>
                                                 </div>
                                             </div>
-                                            <div className="col-span-3">
-                                                <p className="text-white">New York, USA</p>
-                                            </div>
-                                            <div className="col-span-3">
-                                                <p className="text-white">2 minutes ago</p>
-                                            </div>
-                                            <div className="col-span-2 flex items-center justify-between">
-                                                <p className="text-white text-sm">Dec 20, 2025, 10:30 AM</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Other Sessions */}
-                                        <div className="grid grid-cols-12 gap-4 px-4 py-4 bg-zinc-950 border border-zinc-800 rounded-lg items-center">
-                                            <div className="col-span-4 flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-zinc-900 border border-zinc-700 rounded-lg flex items-center justify-center">
-                                                    <span className="text-xl">📱</span>
-                                                </div>
-                                                <div>
-                                                    <p className="text-white font-semibold">Safari on iPhone</p>
-                                                    <p className="text-gray-500 text-xs">Mobile App</p>
-                                                </div>
-                                            </div>
-                                            <div className="col-span-3">
-                                                <p className="text-white">New York, USA</p>
-                                            </div>
-                                            <div className="col-span-3">
-                                                <p className="text-white">8 hours ago</p>
-                                            </div>
-                                            <div className="col-span-2 flex items-center justify-between">
-                                                <p className="text-white text-sm">Dec 20, 2025, 02:15 AM</p>
-                                                <button className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded-lg transition-all">
-                                                    Revoke
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-12 gap-4 px-4 py-4 bg-zinc-950 border border-zinc-800 rounded-lg items-center">
-                                            <div className="col-span-4 flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-zinc-900 border border-zinc-700 rounded-lg flex items-center justify-center">
-                                                    <span className="text-xl">🔑</span>
-                                                </div>
-                                                <div>
-                                                    <p className="text-white font-semibold">API Access Token</p>
-                                                    <p className="text-gray-500 text-xs">Integration Script</p>
-                                                </div>
-                                            </div>
-                                            <div className="col-span-3">
-                                                <p className="text-white">-</p>
-                                            </div>
-                                            <div className="col-span-3">
-                                                <p className="text-white">1 day ago</p>
-                                            </div>
-                                            <div className="col-span-2 flex items-center justify-between">
-                                                <p className="text-white text-sm">Dec 19, 2025, 11:00 AM</p>
-                                                <button className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded-lg transition-all">
-                                                    Revoke
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Manage API Keys Link */}
-                                    <div className="mt-8 p-6 bg-gradient-to-r from-cyan/10 to-purple/10 border border-cyan/30 rounded-xl">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <h3 className="text-cyan-light text-lg font-semibold mb-2">Manage API Keys</h3>
-                                                <p className="text-gray-400 text-sm">Create, modify, or revoke your integration API keys.</p>
-                                            </div>
-                                            <Link
-                                                to="/api-keys"
-                                                className="flex items-center gap-2 px-6 py-3 bg-cyan-light hover:bg-cyan text-black font-semibold rounded-lg transition-all"
-                                            >
-                                                Go to API Keys
-                                                <span>→</span>
+                                            <Link to="/api-keys" className="px-6 py-3 bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-zinc-200 transition-all">
+                                                Enter Forge
                                             </Link>
-                                        </div>
-                                    </div>
-
-                                    {/* Recent Activity Log */}
-                                    <h3 className="text-lg font-semibold text-white mt-8 mb-4">Recent Activity Log</h3>
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-3 p-3 bg-zinc-950 border border-zinc-800 rounded-lg text-sm">
-                                            <span className="text-gray-500">2025-12-15 10:30 AM</span>
-                                            <span className="text-white">Password changed successfully</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 p-3 bg-zinc-950 border border-zinc-800 rounded-lg text-sm">
-                                            <span className="text-gray-500">2025-12-10 09:00 PM</span>
-                                            <span className="text-white">Email address updated from old@example.com</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 p-3 bg-zinc-950 border border-zinc-800 rounded-lg text-sm">
-                                            <span className="text-gray-500">2025-12-05 02:15 PM</span>
-                                            <span className="text-white">New API Key generated for 'Staging Env'</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* API Keys Tab */}
-                        {activeTab === 'api-keys' && (
-                            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-2xl font-bold text-white">API Keys</h2>
-                                    <button className="px-4 py-2 bg-purple hover:bg-purple-dark text-white font-semibold rounded-lg transition-all">
-                                        Generate New Key
-                                    </button>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h3 className="text-white font-semibold">Production API Key</h3>
-                                            <span className="px-2 py-1 bg-green-500/20 text-green-500 border border-green-500 rounded text-xs font-semibold">
-                                                Active
-                                            </span>
-                                        </div>
-                                        <p className="text-gray-400 text-sm font-mono mb-3">sk_prod_••••••••••••••••••••1234</p>
-                                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                                            <span>Created: 2025-11-01</span>
-                                            <span>•</span>
-                                            <span>Last used: 2 hours ago</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 mt-3">
-                                            <button className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-white text-sm rounded-lg transition-all">
-                                                Copy
-                                            </button>
-                                            <button className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-all">
-                                                Revoke
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-lg">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h3 className="text-white font-semibold">Staging API Key</h3>
-                                            <span className="px-2 py-1 bg-green-500/20 text-green-500 border border-green-500 rounded text-xs font-semibold">
-                                                Active
-                                            </span>
-                                        </div>
-                                        <p className="text-gray-400 text-sm font-mono mb-3">sk_test_••••••••••••••••••••5678</p>
-                                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                                            <span>Created: 2025-12-05</span>
-                                            <span>•</span>
-                                            <span>Last used: 1 day ago</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 mt-3">
-                                            <button className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-white text-sm rounded-lg transition-all">
-                                                Copy
-                                            </button>
-                                            <button className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-all">
-                                                Revoke
-                                            </button>
                                         </div>
                                     </div>
                                 </div>

@@ -23,6 +23,8 @@ import RLInsights from './pages/RLInsights';
 import UserSettings from './pages/UserSettings';
 import APIKeysManagement from './pages/APIKeysManagement';
 
+import ProtectedRoute from './components/ProtectedRoute';
+
 function App() {
   return (
     <Router>
@@ -32,42 +34,44 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
-        {/* Main App with Layout */}
-        <Route
-          path="/*"
-          element={
-            <div className="min-h-screen flex flex-col bg-black">
-              <Navigation />
-              <main className="flex-1">
-                <Routes>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/projects" element={<ProjectList />} />
-                  <Route path="/add-project" element={<AddNewProject />} />
-                  <Route path="/project/:id" element={<ProjectDetails />} />
-                  <Route path="/project/:id/settings" element={<ProjectSettings />} />
-                  <Route path="/project/:id/endpoints" element={<APIEndpoints />} />
-                  <Route path="/project/:id/generate-tests" element={<GenerateTests />} />
-                  <Route path="/project/:id/test-cases" element={<TestCases />} />
-                  <Route path="/project/:id/test-case/:testId" element={<TestCaseDetail />} />
-                  <Route path="/project/:id/runs" element={<TestRunsList />} />
-                  <Route path="/project/:id/run/:runId" element={<RunDetails />} />
-                  <Route path="/project/:id/run/:runId/coverage" element={<CoverageReport />} />
-                  <Route path="/project/:id/run/:runId/healing" element={<HealingReport />} />
-                  <Route path="/analytics/global-coverage" element={<GlobalCoverageReport />} />
-                  <Route path="/analytics/trend-analysis" element={<TrendAnalysis />} />
-                  <Route path="/analytics/rl-insights" element={<RLInsights />} />
-                  <Route path="/settings" element={<UserSettings />} />
-                  <Route path="/api-keys" element={<APIKeysManagement />} />
-                  <Route path="/endpoints" element={<Dashboard />} />
-                  <Route path="/tests" element={<Dashboard />} />
-                  <Route path="/analytics" element={<Dashboard />} />
-                  <Route path="/" element={<Navigate to="/login" replace />} />
-                </Routes>
-              </main>
-              <Footer />
-            </div>
-          }
-        />
+        {/* Protected Routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route
+            path="/*"
+            element={
+              <div className="min-h-screen flex flex-col bg-black">
+                <Navigation />
+                <main className="flex-1">
+                  <Routes>
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/projects" element={<ProjectList />} />
+                    <Route path="/add-project" element={<AddNewProject />} />
+                    <Route path="/project/:id" element={<ProjectDetails />} />
+                    <Route path="/project/:id/settings" element={<ProjectSettings />} />
+                    <Route path="/project/:id/endpoints" element={<APIEndpoints />} />
+                    <Route path="/project/:id/generate-tests" element={<GenerateTests />} />
+                    <Route path="/project/:id/test-cases" element={<TestCases />} />
+                    <Route path="/project/:id/test-case/:testId" element={<TestCaseDetail />} />
+                    <Route path="/project/:id/runs" element={<TestRunsList />} />
+                    <Route path="/project/:id/run/:runId" element={<RunDetails />} />
+                    <Route path="/project/:id/run/:runId/coverage" element={<CoverageReport />} />
+                    <Route path="/project/:id/run/:runId/healing" element={<HealingReport />} />
+                    <Route path="/analytics/global-coverage" element={<GlobalCoverageReport />} />
+                    <Route path="/analytics/trend-analysis" element={<TrendAnalysis />} />
+                    <Route path="/analytics/rl-insights" element={<RLInsights />} />
+                    <Route path="/settings" element={<UserSettings />} />
+                    <Route path="/api-keys" element={<APIKeysManagement />} />
+                    <Route path="/endpoints" element={<Dashboard />} />
+                    <Route path="/tests" element={<Dashboard />} />
+                    <Route path="/analytics" element={<Dashboard />} />
+                    <Route path="/" element={<Navigate to="/projects" replace />} />
+                  </Routes>
+                </main>
+                <Footer />
+              </div>
+            }
+          />
+        </Route>
       </Routes>
     </Router>
   );

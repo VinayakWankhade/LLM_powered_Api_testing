@@ -1,0 +1,275 @@
+openapi: 3.1.0
+info:
+  title: AI TestGen API
+  description: API for the AI-powered Self-Healing Test Automation Platform. Perfectly aligned with the frontend contract.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api
+    description: Local development server
+
+paths:
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, lastName, email, password]
+              properties:
+                firstName: { type: string }
+                lastName: { type: string }
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login to get token
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, description: "Email" }
+                password: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+
+  /auth/verify:
+    get:
+      tags: [Authentication]
+      summary: Verify session token
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List all projects
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProjectCard' }
+    post:
+      tags: [Projects]
+      summary: Create new project
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, gitUrl]
+              properties:
+                name: { type: string }
+                gitUrl: { type: string }
+                description: { type: string }
+                apiBaseUrl: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectResponse' }
+
+  /projects/{projectId}:
+    get:
+      tags: [Projects]
+      summary: Get project details
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectResponse' }
+
+  /projects/{projectId}/endpoints:
+    get:
+      tags: [Scanning]
+      summary: List discovered endpoints
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Endpoint' }
+
+  /projects/{projectId}/endpoints/scan:
+    post:
+      tags: [Scanning]
+      summary: Trigger codebase scan
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      security:
+        - BearerAuth: []
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scanId: { type: string }
+                  status: { type: string }
+                  message: { type: string }
+
+  /projects/{projectId}/test-cases:
+    get:
+      tags: [Tests]
+      summary: List project test cases
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TestCaseListItem' }
+
+  /analytics/dashboard:
+    get:
+      tags: [Analytics]
+      summary: Global dashboard metrics
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnalyticsDashboard' }
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token: { type: string }
+        user:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            firstName: { type: string }
+            email: { type: string, format: email }
+            role: { type: string }
+
+    ProjectCard:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        status: { type: string }
+        endpoints: { type: integer }
+        coverage: { type: number, format: float }
+        trend: { type: string, enum: [up, down, stable] }
+        lastActivity: { type: string, format: date-time }
+
+    ProjectResponse:
+      type: object
+      properties:
+        project:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            stats:
+              type: object
+              properties:
+                endpoints: { type: integer }
+                tests: { type: integer }
+                passRate: { type: number, format: float }
+            recentRuns:
+              type: array
+              items: { type: object }
+
+    Endpoint:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        method: { type: string }
+        path: { type: string }
+        status: { type: string }
+        lastScanned: { type: string, format: date-time }
+
+    TestCaseListItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        description: { type: string }
+        status: { type: string }
+        priority: { type: string }
+        type: { type: string }
+
+    AnalyticsDashboard:
+      type: object
+      properties:
+        total_projects: { type: integer }
+        total_endpoints: { type: integer }
+        total_tests: { type: integer }
+        pass_rate: { type: number, format: float }
+        healed_tests: { type: integer }

@@ -1,14 +1,25 @@
 import asyncio
-from app.db.session import engine, Base
-from app.models import Project, Endpoint, TestCase, TestRun
+from app.db.base import Base
+from app.db.session import engine
+
+# Import all models here so that Base knows about them
+from app.domain.models.user import User
+from app.domain.models.project import Project
+from app.domain.models.endpoint import Endpoint
+from app.domain.models.test_case import TestCase
+from app.domain.models.test_run import TestRun
 
 async def init_db():
-    print("🚀 Initializing database schema on Supabase...")
+    """
+    Creates all tables in the database.
+    
+    Warning: This is for development only! In production, 
+    we use 'Alembic' for migrations.
+    """
     async with engine.begin() as conn:
-        # Warning: This will drop tables if they exist if you use Base.metadata.drop_all
-        # For a clean start, we use create_all
+        print("Creating tables...")
         await conn.run_sync(Base.metadata.create_all)
-    print("✅ Database schema initialized successfully!")
+        print("Tables created successfully!")
 
 if __name__ == "__main__":
     asyncio.run(init_db())

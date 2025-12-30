@@ -1,597 +1,307 @@
-import { ArrowLeft, Info, Copy, Eye, EyeOff } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { ArrowLeft, Info, Copy, Eye, EyeOff, Save, Trash2, Loader2, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { projectsApi } from '../api';
 
 const ProjectSettings = () => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
     const [formData, setFormData] = useState({
-        projectName: 'E-Commerce API',
-        lastUpdated: '2025-01-15 14:32:00',
-        description: 'Main backend API for e-commerce platform',
-        autoScan: true,
-        scanInterval: '24',
-        directoriesToIgnore: ['node_modules', '.git', 'dist', 'build', 'coverage'],
-        includedFileTypes: ['.js', '.ts', '.jsx', '.tsx'],
-        gitIntegration: true,
-        repositoryUrl: 'https://github.com/company/ecommerce-api',
-        defaultBranch: 'main',
-        enableWebhook: true,
-        webhookUrl: '••••••••••••••••••••••••••••••••••••••••',
+        name: '',
+        description: '',
+        gitUrl: '',
+        apiBaseUrl: '',
     });
 
-    const [showWebhookUrl, setShowWebhookUrl] = useState(false);
-    const [newDirectory, setNewDirectory] = useState('');
-    const [newFileType, setNewFileType] = useState('');
+    useEffect(() => {
+        const fetchProject = async () => {
+            try {
+                setLoading(true);
+                const data = await projectsApi.get(id);
+                setFormData({
+                    name: data.project.name || '',
+                    description: data.project.description || '',
+                    gitUrl: data.project.gitUrl || '',
+                    apiBaseUrl: data.project.apiBaseUrl || '',
+                });
+            } catch (err) {
+                console.error("Failed to load project:", err);
+                setError("Failed to retrieve project nexus configuration.");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchProject();
+    }, [id]);
 
     const handleInputChange = (e) => {
-        const { name, value, type, checked } = e.target;
+        const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : value
+            [name]: value
         }));
     };
 
-    const addDirectory = () => {
-        if (newDirectory.trim()) {
-            setFormData(prev => ({
-                ...prev,
-                directoriesToIgnore: [...prev.directoriesToIgnore, newDirectory.trim()]
-            }));
-            setNewDirectory('');
+    const handleSaveChanges = async () => {
+        try {
+            setSaving(true);
+            setError(null);
+
+            const payload = {
+                name: formData.name,
+                description: formData.description,
+                git_url: formData.gitUrl,
+                api_base_url: formData.apiBaseUrl,
+            };
+
+            await projectsApi.update(id, payload);
+            // Optionally show success toast
+        } catch (err) {
+            console.error("Update failed:", err);
+            setError("Failed to sync project changes to the cloud.");
+        } finally {
+            setSaving(false);
         }
     };
 
-    const removeDirectory = (dir) => {
-        setFormData(prev => ({
-            ...prev,
-            directoriesToIgnore: prev.directoriesToIgnore.filter(d => d !== dir)
-        }));
-    };
-
-    const addFileType = () => {
-        if (newFileType.trim()) {
-            setFormData(prev => ({
-                ...prev,
-                includedFileTypes: [...prev.includedFileTypes, newFileType.trim()]
-            }));
-            setNewFileType('');
+    const handleDeleteProject = async () => {
+        try {
+            setSaving(true);
+            await projectsApi.delete(id);
+            navigate('/projects');
+        } catch (err) {
+            console.error("Deletion failed:", err);
+            setError("Failed to decommission project nexus. Permission denied or system error.");
+            setShowDeleteConfirm(false);
+        } finally {
+            setSaving(false);
         }
     };
 
-    const removeFileType = (type) => {
-        setFormData(prev => ({
-            ...prev,
-            includedFileTypes: prev.includedFileTypes.filter(t => t !== type)
-        }));
-    };
-
-    const copyWebhookUrl = () => {
-        navigator.clipboard.writeText('https://api.aitestgen.com/webhook/abc123def456');
-        // Show toast notification
-    };
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-black flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="text-purple animate-spin" size={48} />
+                    <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Querying Project Core...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-black">
-            <div className="max-w-[1200px] mx-auto px-8 py-8">
+            <div className="max-w-[1200px] mx-auto px-8 py-12 relative">
+                {/* Background Glow */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-purple/5 blur-[120px] pointer-events-none rounded-full"></div>
+
                 {/* Back Button */}
                 <Link
-                    to="/projects"
-                    className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-6"
+                    to={`/project/${id}`}
+                    className="inline-flex items-center gap-2 text-zinc-500 hover:text-white transition-all mb-10 group"
                 >
-                    <ArrowLeft size={16} />
-                    <span className="text-sm">Back</span>
+                    <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Return to Nexus</span>
                 </Link>
 
                 {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-4xl font-bold text-white mb-2">Project Settings</h1>
-                    <p className="text-gray-400">Configure project-specific settings, integrations, and preferences</p>
+                <div className="flex items-center justify-between mb-12">
+                    <div>
+                        <h1 className="text-4xl font-black text-white mb-2 uppercase tracking-tighter italic">Project Configuration</h1>
+                        <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest leading-loose">Internal settings for {formData.name}</p>
+                    </div>
                 </div>
 
+                {error && (
+                    <div className="mb-8 p-5 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-4 animate-in fade-in slide-in-from-top-2">
+                        <AlertTriangle size={20} className="text-red-500 flex-shrink-0" />
+                        <p className="text-red-500 text-[10px] font-black uppercase tracking-[0.15em] leading-relaxed">{error}</p>
+                    </div>
+                )}
+
                 {/* Form Sections */}
-                <div className="space-y-6">
+                <div className="space-y-8 relative z-10">
                     {/* Project Information */}
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-                        <div className="flex items-center gap-2 mb-6">
-                            <Info size={20} className="text-purple-light" />
-                            <h2 className="text-xl font-bold text-purple-light">Project Information</h2>
+                    <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-[32px] p-10 shadow-2xl">
+                        <div className="flex items-center gap-3 mb-10">
+                            <div className="w-10 h-10 rounded-xl bg-purple/10 flex items-center justify-center border border-purple/20">
+                                <Info size={20} className="text-purple" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-black text-white uppercase tracking-tight">Core Metadata</h2>
+                                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Primary project identifiers</p>
+                            </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label htmlFor="projectName" className="block text-sm font-medium text-white mb-2">
-                                    Project Name
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">
+                                    Entity Name
                                 </label>
                                 <input
                                     type="text"
-                                    id="projectName"
-                                    name="projectName"
-                                    value={formData.projectName}
+                                    name="name"
+                                    value={formData.name}
                                     onChange={handleInputChange}
-                                    className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/10 transition-all"
+                                    className="w-full px-5 py-4 bg-black border border-white/10 rounded-2xl text-white placeholder:text-zinc-800 focus:border-purple focus:ring-1 focus:ring-purple/20 transition-all outline-none font-bold text-sm"
                                 />
                             </div>
 
-                            <div>
-                                <label htmlFor="lastUpdated" className="block text-sm font-medium text-white mb-2">
-                                    Last Updated
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">
+                                    Source Repository (GIT URL)
                                 </label>
                                 <input
                                     type="text"
-                                    id="lastUpdated"
-                                    name="lastUpdated"
-                                    value={formData.lastUpdated}
-                                    disabled
-                                    className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-gray-500 cursor-not-allowed"
+                                    name="gitUrl"
+                                    value={formData.gitUrl}
+                                    onChange={handleInputChange}
+                                    className="w-full px-5 py-4 bg-black border border-white/10 rounded-2xl text-white placeholder:text-zinc-800 focus:border-purple focus:ring-1 focus:ring-purple/20 transition-all outline-none font-bold text-sm"
                                 />
                             </div>
 
-                            <div className="md:col-span-2">
-                                <label htmlFor="description" className="block text-sm font-medium text-white mb-2">
-                                    Project Description
+                            <div className="md:col-span-2 space-y-2">
+                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">
+                                    API Endpoint Base
+                                </label>
+                                <input
+                                    type="text"
+                                    name="apiBaseUrl"
+                                    value={formData.apiBaseUrl}
+                                    onChange={handleInputChange}
+                                    placeholder="https://api.example.com"
+                                    className="w-full px-5 py-4 bg-black border border-white/10 rounded-2xl text-white placeholder:text-zinc-800 focus:border-purple focus:ring-1 focus:ring-purple/20 transition-all outline-none font-bold text-sm"
+                                />
+                            </div>
+
+                            <div className="md:col-span-2 space-y-2">
+                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">
+                                    Mission Description
                                 </label>
                                 <textarea
-                                    id="description"
                                     name="description"
-                                    rows="3"
+                                    rows="4"
                                     value={formData.description}
                                     onChange={handleInputChange}
-                                    className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/10 transition-all resize-none"
+                                    className="w-full px-5 py-4 bg-black border border-white/10 rounded-2xl text-white placeholder:text-zinc-800 focus:border-purple focus:ring-1 focus:ring-purple/20 transition-all outline-none font-bold text-sm resize-none"
                                 ></textarea>
                             </div>
                         </div>
                     </div>
 
-                    {/* Codebase Scan Settings */}
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-                        <div className="flex items-center gap-2 mb-6">
-                            <span className="text-xl">🔍</span>
-                            <h2 className="text-xl font-bold text-purple-light">Codebase Scan Settings</h2>
+                    {/* Git & Webhook (Feature Ready UI) */}
+                    <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-[32px] p-10 opacity-50 grayscale pointer-events-none relative overflow-hidden group">
+                        <div className="absolute inset-0 flex items-center justify-center z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60">
+                            <span className="text-[10px] font-black text-white uppercase tracking-[0.3em] bg-purple px-4 py-2 rounded-lg">Coming in Version 2.0</span>
                         </div>
-
-                        <div className="space-y-6">
-                            {/* Auto Scanning Toggle */}
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-white font-medium">Enable Automatic Scanning</p>
-                                    <p className="text-gray-400 text-sm">Automatically scan codebase for API changes</p>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        name="autoScan"
-                                        checked={formData.autoScan}
-                                        onChange={handleInputChange}
-                                        className="sr-only peer"
-                                    />
-                                    <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple/10 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple"></div>
-                                </label>
+                        <div className="flex items-center gap-3 mb-8">
+                            <div className="w-10 h-10 rounded-xl bg-cyan-light/10 flex items-center justify-center border border-cyan-light/20">
+                                <ShieldAlert size={20} className="text-cyan-light" />
                             </div>
-
-                            {/* Scan Interval */}
                             <div>
-                                <label htmlFor="scanInterval" className="block text-sm font-medium text-white mb-2">
-                                    Scan Interval (hours)
-                                </label>
-                                <input
-                                    type="number"
-                                    id="scanInterval"
-                                    name="scanInterval"
-                                    value={formData.scanInterval}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/10 transition-all"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">Scan will run every 24 hours</p>
+                                <h2 className="text-xl font-black text-white uppercase tracking-tight">Advanced Protocols</h2>
+                                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Webhooks & Git synchronization</p>
                             </div>
-
-                            {/* Directories to Ignore */}
-                            <div>
-                                <label className="block text-sm font-medium text-white mb-2">
-                                    Directories to Ignore
-                                </label>
-                                <div className="flex gap-2 mb-3">
-                                    <input
-                                        type="text"
-                                        placeholder="e.g., node_modules, dist"
-                                        value={newDirectory}
-                                        onChange={(e) => setNewDirectory(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && addDirectory()}
-                                        className="flex-1 px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/10 transition-all"
-                                    />
-                                    <button
-                                        onClick={addDirectory}
-                                        className="px-6 py-2.5 bg-purple hover:bg-purple-dark text-white font-semibold rounded-lg transition-all"
-                                    >
-                                        + Add
-                                    </button>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {formData.directoriesToIgnore.map((dir, index) => (
-                                        <span
-                                            key={index}
-                                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple/20 text-purple-light border border-purple/30 rounded-lg text-sm"
-                                        >
-                                            {dir}
-                                            <button
-                                                onClick={() => removeDirectory(dir)}
-                                                className="hover:text-white transition-colors"
-                                            >
-                                                ×
-                                            </button>
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Included File Types */}
-                            <div>
-                                <label className="block text-sm font-medium text-white mb-2">
-                                    Included File Types
-                                </label>
-                                <div className="flex gap-2 mb-3">
-                                    <input
-                                        type="text"
-                                        placeholder="e.g., .js, .ts, .jsx"
-                                        value={newFileType}
-                                        onChange={(e) => setNewFileType(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && addFileType()}
-                                        className="flex-1 px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/10 transition-all"
-                                    />
-                                    <button
-                                        onClick={addFileType}
-                                        className="px-6 py-2.5 bg-purple hover:bg-purple-dark text-white font-semibold rounded-lg transition-all"
-                                    >
-                                        + Add
-                                    </button>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {formData.includedFileTypes.map((type, index) => (
-                                        <span
-                                            key={index}
-                                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-cyan-light/20 text-cyan-light border border-cyan-light/30 rounded-lg text-sm"
-                                        >
-                                            {type}
-                                            <button
-                                                onClick={() => removeFileType(type)}
-                                                className="hover:text-white transition-colors"
-                                            >
-                                                ×
-                                            </button>
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Info Box */}
-                            <div className="bg-cyan-light/10 border border-cyan-light/30 rounded-lg p-4 flex items-start gap-3">
-                                <Info size={20} className="text-cyan-light flex-shrink-0 mt-0.5" />
-                                <p className="text-cyan-light text-sm">
-                                    Scan settings determine which files and directories are analyzed for API endpoints. Ignored directories are excluded from scanning to improve performance.
-                                </p>
-                            </div>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="h-4 w-3/4 bg-zinc-800 rounded-full animate-pulse"></div>
+                            <div className="h-4 w-1/2 bg-zinc-800 rounded-full animate-pulse"></div>
                         </div>
                     </div>
 
-                    {/* Git Integration */}
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-                        <div className="flex items-center gap-2 mb-6">
-                            <span className="text-xl">🔗</span>
-                            <h2 className="text-xl font-bold text-purple-light">Git Integration</h2>
+                    {/* Danger Zone */}
+                    <div className="bg-red-500/5 border border-red-500/10 rounded-[32px] p-10">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                                <ShieldAlert size={20} className="text-red-500" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-black text-red-500 uppercase tracking-tight italic">Decommissioning Zone</h2>
+                                <p className="text-[10px] text-red-500/50 font-bold uppercase tracking-widest">Destructive operations</p>
+                            </div>
                         </div>
 
-                        <div className="space-y-6">
-                            {/* Enable Git Integration */}
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-white font-medium">Enable Git Integration</p>
-                                    <p className="text-gray-400 text-sm">Connect to your Git repository for automatic scanning on commits</p>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        name="gitIntegration"
-                                        checked={formData.gitIntegration}
-                                        onChange={handleInputChange}
-                                        className="sr-only peer"
-                                    />
-                                    <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple/10 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple"></div>
-                                </label>
-                            </div>
-
-                            {/* Repository URL */}
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-6 bg-red-500/5 border border-red-500/10 rounded-2xl">
                             <div>
-                                <label htmlFor="repositoryUrl" className="block text-sm font-medium text-white mb-2">
-                                    Repository URL
-                                </label>
-                                <input
-                                    type="text"
-                                    id="repositoryUrl"
-                                    name="repositoryUrl"
-                                    value={formData.repositoryUrl}
-                                    onChange={handleInputChange}
-                                    placeholder="Full URL to your Git repository"
-                                    className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/10 transition-all"
-                                />
+                                <h3 className="text-white font-bold mb-1">Erase Project Nexus</h3>
+                                <p className="text-zinc-500 text-xs">Permanently remove all data, test cases, and analytics associated with this project. This action cannot be reversed.</p>
                             </div>
-
-                            {/* Default Branch */}
-                            <div>
-                                <label htmlFor="defaultBranch" className="block text-sm font-medium text-white mb-2">
-                                    Default Branch
-                                </label>
-                                <input
-                                    type="text"
-                                    id="defaultBranch"
-                                    name="defaultBranch"
-                                    value={formData.defaultBranch}
-                                    onChange={handleInputChange}
-                                    placeholder="Branch to scan for API changes"
-                                    className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/10 transition-all"
-                                />
-                            </div>
-
-                            {/* Enable Webhook */}
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-white font-medium">Enable Webhook</p>
-                                    <p className="text-gray-400 text-sm">Automatically trigger scans on push events</p>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        name="enableWebhook"
-                                        checked={formData.enableWebhook}
-                                        onChange={handleInputChange}
-                                        className="sr-only peer"
-                                    />
-                                    <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple/10 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple"></div>
-                                </label>
-                            </div>
-
-                            {/* Webhook URL */}
-                            <div>
-                                <label className="block text-sm font-medium text-white mb-2">
-                                    Webhook URL
-                                </label>
-                                <div className="relative">
-                                    <input
-                                        type={showWebhookUrl ? 'text' : 'password'}
-                                        value={showWebhookUrl ? 'https://api.aitestgen.com/webhook/abc123def456' : formData.webhookUrl}
-                                        disabled
-                                        className="w-full px-4 py-3 pr-24 bg-zinc-950 border border-zinc-800 rounded-lg text-white cursor-not-allowed"
-                                    />
-                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                        <button
-                                            onClick={() => setShowWebhookUrl(!showWebhookUrl)}
-                                            className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-gray-400 hover:text-white"
-                                        >
-                                            {showWebhookUrl ? <EyeOff size={16} /> : <Eye size={16} />}
-                                        </button>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={copyWebhookUrl}
-                                    className="mt-2 flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm rounded-lg transition-all"
-                                >
-                                    <Copy size={14} />
-                                    Copy Webhook URL
-                                </button>
-                            </div>
-
-                            {/* Info Box */}
-                            <div className="bg-cyan-light/10 border border-cyan-light/30 rounded-lg p-4 flex items-start gap-3">
-                                <Info size={20} className="text-cyan-light flex-shrink-0 mt-0.5" />
-                                <p className="text-cyan-light text-sm">
-                                    Add this URL as a webhook in your Git repository settings to enable automatic scanning. Git integration allows automatic API scanning when code is pushed to your repository, keeping your tests synchronized with your codebase.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Integration Credentials */}
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-                        <div className="flex items-center gap-2 mb-6">
-                            <span className="text-xl">🔑</span>
-                            <h2 className="text-xl font-bold text-purple-light">Integration Credentials</h2>
-                        </div>
-
-                        <div className="space-y-6">
-                            {/* API Key */}
-                            <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <label className="block text-sm font-medium text-white">API Key</label>
-                                    <span className="px-2 py-0.5 bg-green-500/20 text-green-500 border border-green-500 rounded text-xs font-bold uppercase">
-                                        Active
-                                    </span>
-                                </div>
-                                <div className="relative">
-                                    <input
-                                        type="password"
-                                        value="••••••••••••••••••••••••••••"
-                                        disabled
-                                        className="w-full px-4 py-3 pr-24 bg-zinc-950 border border-zinc-800 rounded-lg text-white cursor-not-allowed"
-                                    />
-                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                        <button className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-gray-400 hover:text-white">
-                                            <Eye size={16} />
-                                        </button>
-                                        <button className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-gray-400 hover:text-white">
-                                            <Copy size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                                <p className="text-xs text-gray-400 mt-1">Used for API authentication and integrations</p>
-                                <button className="mt-3 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm rounded-lg transition-all flex items-center gap-2">
-                                    <span>🔄</span>
-                                    Regenerate API Key
-                                </button>
-                            </div>
-
-                            {/* Authentication Token */}
-                            <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <label className="block text-sm font-medium text-white">Authentication Token</label>
-                                    <span className="px-2 py-0.5 bg-green-500/20 text-green-500 border border-green-500 rounded text-xs font-bold uppercase">
-                                        Active
-                                    </span>
-                                </div>
-                                <div className="relative">
-                                    <input
-                                        type="password"
-                                        value="••••••••••••••••••••••••••••••••••••"
-                                        disabled
-                                        className="w-full px-4 py-3 pr-24 bg-zinc-950 border border-zinc-800 rounded-lg text-white cursor-not-allowed"
-                                    />
-                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                        <button className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-gray-400 hover:text-white">
-                                            <Eye size={16} />
-                                        </button>
-                                        <button className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-gray-400 hover:text-white">
-                                            <Copy size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                                <p className="text-xs text-gray-400 mt-1">Used for Git repository and external service authentication</p>
-                                <button className="mt-3 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm rounded-lg transition-all flex items-center gap-2">
-                                    <span>🔄</span>
-                                    Regenerate Auth Token
-                                </button>
-                            </div>
-
-                            {/* Warning Box */}
-                            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4 flex items-start gap-3">
-                                <AlertTriangle size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
-                                <div>
-                                    <p className="text-orange-500 font-semibold text-sm mb-1">Warning</p>
-                                    <p className="text-orange-400 text-sm">Regenerating credentials will invalidate the old ones. Update any external integrations using these credentials immediately.</p>
-                                </div>
-                            </div>
-
-                            {/* Info Box */}
-                            <div className="bg-cyan-light/10 border border-cyan-light/30 rounded-lg p-4 flex items-start gap-3">
-                                <Info size={20} className="text-cyan-light flex-shrink-0 mt-0.5" />
-                                <p className="text-cyan-light text-sm">
-                                    Keep your credentials secure and never share them publicly. Rotate credentials regularly for enhanced security.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Notification Preferences */}
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-                        <div className="flex items-center gap-2 mb-6">
-                            <span className="text-xl">🔔</span>
-                            <h2 className="text-xl font-bold text-purple-light">Notification Preferences</h2>
-                        </div>
-
-                        <div className="space-y-6">
-                            {/* Email Notifications */}
-                            <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <div>
-                                        <p className="text-white font-medium">Email Notifications</p>
-                                        <p className="text-gray-400 text-sm">Receive email alerts for test execution events</p>
-                                    </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            defaultChecked
-                                            className="sr-only peer"
-                                        />
-                                        <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple/10 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple"></div>
-                                    </label>
-                                </div>
-
-                                <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 space-y-3">
-                                    <label className="flex items-center gap-3 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            defaultChecked
-                                            className="w-4 h-4 bg-zinc-800 border-zinc-700 rounded text-red-500 focus:ring-2 focus:ring-red-500/10"
-                                        />
-                                        <span className="text-white text-sm">Notify on Test Failure</span>
-                                    </label>
-                                    <label className="flex items-center gap-3 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            className="w-4 h-4 bg-zinc-800 border-zinc-700 rounded text-green-500 focus:ring-2 focus:ring-green-500/10"
-                                        />
-                                        <span className="text-white text-sm">Notify on Test Success</span>
-                                    </label>
-                                    <label className="flex items-center gap-3 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            defaultChecked
-                                            className="w-4 h-4 bg-zinc-800 border-zinc-700 rounded text-purple focus:ring-2 focus:ring-purple/10"
-                                        />
-                                        <span className="text-white text-sm">Notify on Test Completion</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            {/* Slack Integration */}
-                            <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <div>
-                                        <p className="text-white font-medium">Slack Integration</p>
-                                        <p className="text-gray-400 text-sm">Send test notifications to Slack channel</p>
-                                    </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            defaultChecked
-                                            className="sr-only peer"
-                                        />
-                                        <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple/10 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple"></div>
-                                    </label>
-                                </div>
-
-                                <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
-                                    <label className="block text-sm font-medium text-white mb-2">
-                                        Slack Webhook URL
-                                    </label>
-                                    <div className="relative mb-3">
-                                        <input
-                                            type="password"
-                                            value="••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••"
-                                            disabled
-                                            className="w-full px-4 py-3 pr-12 bg-zinc-900 border border-zinc-800 rounded-lg text-white cursor-not-allowed"
-                                        />
-                                        <button className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-zinc-800 rounded-lg transition-colors text-gray-400 hover:text-white">
-                                            <Eye size={16} />
-                                        </button>
-                                    </div>
-                                    <p className="text-xs text-gray-400 mb-3">Get this from your Slack workspace settings</p>
-                                    <button className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm rounded-lg transition-all flex items-center gap-2">
-                                        <span>📤</span>
-                                        Send Test Notification
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Info Box */}
-                            <div className="bg-cyan-light/10 border border-cyan-light/30 rounded-lg p-4 flex items-start gap-3">
-                                <Info size={20} className="text-cyan-light flex-shrink-0 mt-0.5" />
-                                <p className="text-cyan-light text-sm">
-                                    Configure how and when you receive notifications about test execution results, failures, and system events.
-                                </p>
-                            </div>
+                            <button
+                                onClick={() => setShowDeleteConfirm(true)}
+                                className="px-6 py-4 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-red-500/20 flex items-center gap-2"
+                            >
+                                <Trash2 size={16} />
+                                Purge Project
+                            </button>
                         </div>
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex items-center justify-end gap-4">
+                    <div className="flex items-center justify-end gap-6 pt-4">
                         <Link
-                            to="/projects"
-                            className="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold rounded-lg transition-all"
+                            to={`/project/${id}`}
+                            className="px-8 py-4 text-zinc-500 hover:text-white text-[10px] font-black uppercase tracking-widest transition-colors"
                         >
-                            Cancel
+                            Discard Changes
                         </Link>
-                        <button className="px-6 py-3 bg-purple hover:bg-purple-dark text-white font-semibold rounded-lg transition-all hover:shadow-glow-purple">
-                            Save Changes
+                        <button
+                            onClick={handleSaveChanges}
+                            disabled={saving}
+                            className={`px-10 py-5 bg-purple hover:bg-purple-dark text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl shadow-purple/20 flex items-center gap-3 ${saving ? 'opacity-80' : ''}`}
+                        >
+                            {saving ? (
+                                <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    Synchronizing...
+                                </>
+                            ) : (
+                                <>
+                                    <Save size={16} />
+                                    Commit Configuration
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>
             </div>
+
+            {/* Deletion Modal */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => !saving && setShowDeleteConfirm(false)}></div>
+                    <div className="relative bg-zinc-900 border border-white/10 rounded-[40px] p-12 max-w-md w-full shadow-2xl">
+                        <div className="w-20 h-20 rounded-3xl bg-red-500/10 flex items-center justify-center border border-red-500/20 mx-auto mb-8">
+                            <ShieldAlert size={40} className="text-red-500" />
+                        </div>
+                        <h2 className="text-3xl font-black text-white text-center mb-4 uppercase tracking-tighter">Confirm Purge?</h2>
+                        <p className="text-zinc-500 text-center mb-10 text-xs font-bold leading-relaxed uppercase tracking-widest">
+                            You are about to initiate the permanent deletion of <span className="text-white italic">{formData.name}</span>. All neural data will be lost.
+                        </p>
+                        <div className="flex flex-col gap-4">
+                            <button
+                                onClick={handleDeleteProject}
+                                disabled={saving}
+                                className="w-full py-5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-[0.3em] rounded-2xl transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
+                            >
+                                {saving ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                Confirm Decommission
+                            </button>
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                disabled={saving}
+                                className="w-full py-5 bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-black uppercase tracking-[0.3em] rounded-2xl transition-all"
+                            >
+                                Abort Sequence
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
